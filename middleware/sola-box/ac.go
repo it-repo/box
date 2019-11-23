@@ -1,6 +1,8 @@
 package box
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/ddosakura/sola/v2"
@@ -37,8 +39,10 @@ func AC(db *gorm.DB, key string) (sola.Middleware, RequestAC) {
 	_auth := auth.Auth(auth.AuthJWT, []byte(key))
 	s := ac.New(db)
 	r := router.New()
+	r.Prefix = "/user"
 	r.BindFunc("POST /login", auth.NewFunc(_sign, login, loginSuccess))
 	r.BindFunc("/logout", auth.CleanFunc(success))
+	r.BindFunc("/info", auth.NewFunc(_auth, nil, userInfo))
 	r.BindFunc("POST /register", register) // TODO: remove
 
 	routes := sola.Merge(func(next sola.Handler) sola.Handler {
@@ -74,17 +78,31 @@ func AC(db *gorm.DB, key string) (sola.Middleware, RequestAC) {
 	return routes, requestAC
 }
 
+// ReqLogin Form
+type ReqLogin struct {
+	Username string
+	Password string
+}
+
 func login(next sola.Handler) sola.Handler {
 	return func(c sola.Context) error {
 		s := c[CtxBoxAC].(*ac.Srv)
 		r := c.Request()
-		name := r.PostFormValue("name")
-		pass := r.PostFormValue("pass")
 
-		if name == "" || pass == "" {
+		// TODO: 内置到 sola 框架中 (ReadJSON)
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			return err
+		}
+		var a ReqLogin
+		if err = json.Unmarshal(body, &a); err != nil {
+			return err
+		}
+
+		if a.Username == "" || a.Password == "" {
 			return fail(c)
 		}
-		u := s.Login(name, pass)
+		u := s.Login(a.Username, a.Password)
 		if u == nil {
 			return fail(c)
 		}
@@ -105,7 +123,34 @@ func loginSuccess(c sola.Context) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"code": 0,
 		"msg":  "SUCCESS",
-		"data": c[auth.CtxClaims],
+		"data": map[string]interface{}{
+			"token": c[auth.CtxToken],
+		},
+	})
+}
+
+// TODO: refresh roles/perms
+
+func userInfo(c sola.Context) error {
+	s := c[CtxBoxAC].(*ac.Srv)
+	id := auth.Claims(c, "id").(float64)
+	u := s.SelectByID(uint(id))
+	if u == nil {
+		return fail(c)
+	}
+	roles := s.Roles(u)
+	perms := s.Perms(u)
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"code": 0,
+		"msg":  "SUCCESS",
+		"data": map[string]interface{}{
+			"name":         u.Name,
+			"nick":         u.Nick,
+			"avatar":       u.Avatar,
+			"introduction": u.Desc, // TODO: 前端兼容，暂时改名
+			"roles":        roles,
+			"perms":        perms,
+		},
 	})
 }
 
