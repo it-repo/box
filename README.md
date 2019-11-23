@@ -4,9 +4,12 @@ backend black box
 
 ## Menu
 
-+ middleware  中间件
-    + rbac 基于角色的权限控制
-+ utils       工具集
++ middleware    echo/sola 中间件
++ service       通用服务层
+    + ac   权限控制
+    + menu 菜单（依赖 ac）
+
+// TODO: 散列、盐、CURD
 
 ## Example
 
