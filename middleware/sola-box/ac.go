@@ -1,8 +1,6 @@
 package box
 
 import (
-	"encoding/json"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/ddosakura/sola/v2"
@@ -87,15 +85,9 @@ type ReqLogin struct {
 func login(next sola.Handler) sola.Handler {
 	return func(c sola.Context) error {
 		s := c.Get(CtxBoxAC).(*ac.Srv)
-		r := c.Request()
 
-		// TODO: 内置到 sola 框架中 (ReadJSON)
-		body, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			return err
-		}
 		var a ReqLogin
-		if err = json.Unmarshal(body, &a); err != nil {
+		if err := c.GetJSON(&a); err != nil {
 			return err
 		}
 
