@@ -23,9 +23,9 @@ const (
 // ACR - AC Rule Builder
 func ACR(t ac.Type, l ac.Logical, rules ...string) sola.Handler {
 	return func(c sola.Context) error {
-		c[CtxBoxACRT] = t
-		c[CtxBoxACRL] = l
-		c[CtxBoxACR] = rules
+		c.Set(CtxBoxACRT, t)
+		c.Set(CtxBoxACRL, l)
+		c.Set(CtxBoxACR, rules)
 		return nil
 	}
 }
@@ -47,16 +47,16 @@ func AC(db *gorm.DB, key string) (sola.Middleware, RequestAC) {
 
 	routes := sola.Merge(func(next sola.Handler) sola.Handler {
 		return func(c sola.Context) error {
-			c[CtxBoxAC] = s
+			c.Set(CtxBoxAC, s)
 			return next(c)
 		}
 	}, r.Routes())
 	requestAC := func(acr, h sola.Handler) sola.Handler {
 		return auth.NewFunc(_auth, nil, func(c sola.Context) error {
 			acr(c)
-			t := c[CtxBoxACRT].(ac.Type)
-			l := c[CtxBoxACRL].(ac.Logical)
-			acr := c[CtxBoxACR].([]string)
+			t := c.Get(CtxBoxACRT).(ac.Type)
+			l := c.Get(CtxBoxACRL).(ac.Logical)
+			acr := c.Get(CtxBoxACR).([]string)
 			var rule *ac.Rule
 			if l == ac.LogicalAND {
 				rule = ac.NewRule(acr, true)
@@ -86,7 +86,7 @@ type ReqLogin struct {
 
 func login(next sola.Handler) sola.Handler {
 	return func(c sola.Context) error {
-		s := c[CtxBoxAC].(*ac.Srv)
+		s := c.Get(CtxBoxAC).(*ac.Srv)
 		r := c.Request()
 
 		// TODO: 内置到 sola 框架中 (ReadJSON)
@@ -109,12 +109,12 @@ func login(next sola.Handler) sola.Handler {
 
 		roles := s.Roles(u)
 		perms := s.Perms(u)
-		c[auth.CtxClaims] = map[string]interface{}{
+		c.Set(auth.CtxClaims, map[string]interface{}{
 			"id":    u.ID,
 			"name":  u.Name,
 			"roles": roles,
 			"perms": perms,
-		}
+		})
 		return next(c)
 	}
 }
@@ -124,7 +124,7 @@ func loginSuccess(c sola.Context) error {
 		"code": 0,
 		"msg":  "SUCCESS",
 		"data": map[string]interface{}{
-			"token": c[auth.CtxToken],
+			"token": c.Get(auth.CtxToken),
 		},
 	})
 }
@@ -132,7 +132,7 @@ func loginSuccess(c sola.Context) error {
 // TODO: refresh roles/perms
 
 func userInfo(c sola.Context) error {
-	s := c[CtxBoxAC].(*ac.Srv)
+	s := c.Get(CtxBoxAC).(*ac.Srv)
 	id := auth.Claims(c, "id").(float64)
 	u := s.SelectByID(uint(id))
 	if u == nil {
@@ -155,7 +155,7 @@ func userInfo(c sola.Context) error {
 }
 
 func register(c sola.Context) error {
-	s := c[CtxBoxAC].(*ac.Srv)
+	s := c.Get(CtxBoxAC).(*ac.Srv)
 	r := c.Request()
 	name := r.PostFormValue("name")
 	pass := r.PostFormValue("pass")
