@@ -18,7 +18,7 @@ type BoxUser struct {
 // BoxRole Model
 type BoxRole struct {
 	gorm.Model
-	Users []BoxPerm `gorm:"many2many:box_user_roles;"`
+	Users []BoxUser `gorm:"many2many:box_user_roles;"`
 	Perms []BoxPerm `gorm:"many2many:box_role_perms;"`
 	Name  string    `gorm:"not null;unique"`
 	Desc  string    `gorm:"not null"`

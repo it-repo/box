@@ -131,7 +131,6 @@ func userInfo(c sola.Context) error {
 		return fail(c)
 	}
 	roles := s.Roles(u)
-	perms := s.Perms(u)
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"code": 0,
 		"msg":  "SUCCESS",
@@ -141,7 +140,6 @@ func userInfo(c sola.Context) error {
 			"avatar":       u.Avatar,
 			"introduction": u.Desc, // TODO: 前端兼容，暂时改名
 			"roles":        roles,
-			"perms":        perms,
 		},
 	})
 }
