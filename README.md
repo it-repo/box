@@ -7,8 +7,8 @@ backend black box
 + middleware    echo/sola 中间件
     + // TODO: sola 自定义 code handler
 + service       通用服务层
-    + ac   权限控制
-    + menu 菜单（依赖 ac）
+    + ac    权限控制
+    + Route 路由（依赖 ac）
 
 // TODO: 散列、盐、CURD
 
