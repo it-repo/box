@@ -3,6 +3,8 @@ package box
 import (
 	"net/http"
 
+	"github.com/ddosakura/sola/v2/middleware/logger"
+
 	"github.com/ddosakura/sola/v2"
 	"github.com/ddosakura/sola/v2/middleware/auth"
 	"github.com/ddosakura/sola/v2/middleware/router"
@@ -32,23 +34,22 @@ func ACR(t ac.Type, l ac.Logical, rules ...string) sola.Handler {
 type RequestAC func(arc, h sola.Handler) sola.Handler
 
 // AC Middleware & Srv
-func AC(db *gorm.DB, key string) (sola.Middleware, RequestAC) {
+func AC(db *gorm.DB, key string) (sola.Middleware, *router.Router, RequestAC) {
 	_sign := auth.Sign(auth.AuthJWT, []byte(key))
 	_auth := auth.Auth(auth.AuthJWT, []byte(key))
 	s := ac.New(db)
 	r := router.New()
-	r.Prefix = "/user"
 	r.BindFunc("POST /login", auth.NewFunc(_sign, login, loginSuccess))
 	r.BindFunc("/logout", auth.CleanFunc(success))
 	r.BindFunc("/info", auth.NewFunc(_auth, nil, userInfo))
 	r.BindFunc("POST /register", register) // TODO: remove
 
-	routes := sola.Merge(func(next sola.Handler) sola.Handler {
+	init := func(next sola.Handler) sola.Handler {
 		return func(c sola.Context) error {
 			c.Set(CtxBoxAC, s)
 			return next(c)
 		}
-	}, r.Routes())
+	}
 	requestAC := func(acr, h sola.Handler) sola.Handler {
 		return auth.NewFunc(_auth, nil, func(c sola.Context) error {
 			acr(c)
@@ -73,7 +74,7 @@ func AC(db *gorm.DB, key string) (sola.Middleware, RequestAC) {
 			return c.String(http.StatusForbidden, "Forbidden")
 		})
 	}
-	return routes, requestAC
+	return init, r, requestAC
 }
 
 // ReqLogin Form
@@ -107,6 +108,7 @@ func login(next sola.Handler) sola.Handler {
 			"roles": roles,
 			"perms": perms,
 		})
+		logger.Action(c, u.ID, "login", u.Nick+" login system!")
 		return next(c)
 	}
 }
