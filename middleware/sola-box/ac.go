@@ -1,6 +1,7 @@
 package box
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -31,28 +32,33 @@ func ACR(t ac.Type, l ac.Logical, rules ...string) sola.Handler {
 	}
 }
 
-// RequestAC Check
-type RequestAC func(arc, h sola.Handler) sola.Handler
+// ACRequest Check
+type ACRequest func(arc, h sola.Handler) sola.Handler
 
 // AC Middleware & Srv
-func AC(db *gorm.DB, key string) (sola.Middleware, *router.Router, RequestAC) {
-	_sign := auth.Sign(auth.AuthJWT, []byte(key))
-	_auth := auth.Auth(auth.AuthJWT, []byte(key))
-	s := ac.New(db)
-	r := router.New()
-	r.BindFunc("POST /login", auth.NewFunc(_sign, login, loginSuccess))
-	r.BindFunc("/logout", auth.CleanFunc(success))
-	r.BindFunc("/info", auth.NewFunc(_auth, nil, userInfo))
-	r.BindFunc("POST /register", register) // TODO: remove
+func AC(db *gorm.DB, k string, r *router.Router) (sola.Middleware, ACRequest) {
+	r.Bind("/logout", auth.CleanFunc(success))
 
-	init := func(next sola.Handler) sola.Handler {
+	s := ac.New(db)
+	r.Use(func(next sola.Handler) sola.Handler {
 		return func(c sola.Context) error {
 			c.Set(CtxBoxAC, s)
 			return next(c)
 		}
+	})
+	jwtSign, jwtAuth := auth.NewJWT([]byte(k))
+
+	{
+		sub := r.Sub(nil)
+		sub.Use(auth.LoadAuthCache)
+		h := sola.MergeFunc(loginSuccess, login, jwtSign)
+		sub.Bind("POST /login", h)
 	}
-	requestAC := func(acr, h sola.Handler) sola.Handler {
-		return auth.NewFunc(_auth, nil, func(c sola.Context) error {
+	r.Use(jwtAuth)
+	r.Bind("/info", userInfo)
+
+	acRequest := func(acr, h sola.Handler) sola.Handler {
+		return func(c sola.Context) error {
 			acr(c)
 			t := c.Get(CtxBoxACRT).(ac.Type)
 			l := c.Get(CtxBoxACRL).(ac.Logical)
@@ -69,21 +75,22 @@ func AC(db *gorm.DB, key string) (sola.Middleware, *router.Router, RequestAC) {
 			} else {
 				rules = toStringArray(auth.Claims(c, "perms"))
 			}
+			fmt.Println(rules)
 			if rule.Check(rules) {
 				return h(c)
 			}
 			return c.String(http.StatusForbidden, "Forbidden")
-		})
+		}
 	}
 
 	acr1 := ACR(ac.TypeRole, ac.LogicalOR, "admin")
-	r.BindFunc("GET /user/:id", requestAC(acr1, getUser))
-	r.BindFunc("GET /user", requestAC(acr1, getUsers))
-	r.BindFunc("DELETE /user/:id", requestAC(acr1, delUser))
-	r.BindFunc("POST /user", requestAC(acr1, postUser))
-	r.BindFunc("PUT /user/:id", requestAC(acr1, putUser))
+	r.Bind("GET /user/:id", acRequest(acr1, getUser))
+	r.Bind("GET /user", acRequest(acr1, getUsers))
+	r.Bind("DELETE /user/:id", acRequest(acr1, delUser))
+	r.Bind("POST /user", acRequest(acr1, postUser))
+	r.Bind("PUT /user/:id", acRequest(acr1, putUser))
 
-	return init, r, requestAC
+	return jwtAuth, acRequest
 }
 
 // ReqUser Form
@@ -153,23 +160,6 @@ func userInfo(c sola.Context) error {
 			"roles":        roles,
 		},
 	})
-}
-
-// TODO: need change to getJSON
-func register(c sola.Context) error {
-	s := c.Get(CtxBoxAC).(*ac.Srv)
-	r := c.Request()
-	name := r.PostFormValue("name")
-	pass := r.PostFormValue("pass")
-
-	if name == "" || pass == "" {
-		return fail(c)
-	}
-
-	if s.Register(name, pass) {
-		return success(c)
-	}
-	return fail(c)
 }
 
 // CRUD

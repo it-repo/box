@@ -11,10 +11,9 @@ import (
 )
 
 // Route Middleware
-func Route(db *gorm.DB) *router.Router {
+func Route(db *gorm.DB, r *router.Router) {
 	s := route.New(db)
-	r := router.New()
-	r.BindFunc("/routes", func(c sola.Context) error {
+	r.Bind("/routes", func(c sola.Context) error {
 		perms := toStringArray(auth.Claims(c, "perms"))
 		tree := s.Route(perms...)
 		return c.JSON(http.StatusOK, map[string]interface{}{
@@ -23,5 +22,4 @@ func Route(db *gorm.DB) *router.Router {
 			"data": tree,
 		})
 	})
-	return r
 }
