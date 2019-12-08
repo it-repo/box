@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/ddosakura/sola/v2/middleware/logger"
 
@@ -90,6 +91,12 @@ func AC(db *gorm.DB, k string, r *router.Router) (sola.Middleware, ACRequest) {
 	r.Bind("POST /user", acRequest(acr1, postUser))
 	r.Bind("PUT /user/:id", acRequest(acr1, putUser))
 
+	r.Bind("GET /role/:id", acRequest(acr1, getRole))
+	r.Bind("GET /role", acRequest(acr1, getRoles))
+	r.Bind("DELETE /role/:id", acRequest(acr1, delRole))
+	r.Bind("POST /role", acRequest(acr1, postRole))
+	r.Bind("PUT /role/:id", acRequest(acr1, putRole))
+
 	return jwtAuth, acRequest
 }
 
@@ -172,19 +179,26 @@ func acSucc(c sola.Context, v interface{}) error {
 	})
 }
 
+//user
 func getUsers(c sola.Context) error {
 	s := c.Get(CtxBoxAC).(*ac.Srv)
 	r := c.Request()
 	page, err := strconv.Atoi(r.URL.Query().Get("page"))
 	if err != nil {
-		page = 1
+		return nil
 	}
 	size, err := strconv.Atoi(r.URL.Query().Get("size"))
 	if err != nil {
-		size = 5
+		return nil
 	}
-	list := s.SelectUserList(page, size)
-	return acSucc(c, list)
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"code": 0,
+		"msg":  "SUCCESS",
+		"data": map[string]interface{}{
+			"user":  s.SelectUserList(page, size),
+			"total": s.SelectUsertotal(),
+		},
+	})
 }
 
 func getUser(c sola.Context) error {
@@ -199,10 +213,8 @@ func getUser(c sola.Context) error {
 
 func delUser(c sola.Context) error {
 	s := c.Get(CtxBoxAC).(*ac.Srv)
-	id, e := strconv.Atoi(router.Param(c, "id"))
-	if e != nil {
-		return fail(c)
-	}
+	List := router.Param(c, "id")
+	id := strings.Split(List, ",")
 	s.DeleteUser(id)
 	return acSucc(c, nil)
 }
@@ -239,6 +251,72 @@ func putUser(c sola.Context) error {
 	}
 	if e := s.PutUser(id, a.Nick, a.Password, a.Avatar, a.Desc); e != nil {
 		return fail(c)
+	}
+	return acSucc(c, nil)
+}
+
+//role
+
+//getRoles 获取角色信息
+func getRoles(c sola.Context) error {
+	s := c.Get(CtxBoxAC).(*ac.Srv)
+	r := c.Request()
+	page, err := strconv.Atoi(r.URL.Query().Get("page"))
+	if err != nil {
+		return nil
+	}
+	size, err := strconv.Atoi(r.URL.Query().Get("size"))
+	if err != nil {
+		return nil
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"code": 0,
+		"msg":  "SUCCESS",
+		"data": map[string]interface{}{
+			"total": s.GetRoleCount(),
+			"Roles": s.GetListRole(page, size),
+		},
+	})
+}
+
+//getRole 根据id查询角色
+func getRole(c sola.Context) error {
+	s := c.Get(CtxBoxAC).(*ac.Srv)
+	id, err := strconv.Atoi(router.Param(c, "id"))
+	if err != nil {
+		return fail(c)
+	}
+	r := s.GetRole(uint(id))
+	return acSucc(c, r)
+}
+
+// ReqRole -
+type ReqRole struct {
+	Name string
+	Desc string
+}
+
+func postRole(c sola.Context) error {
+	s := c.Get(CtxBoxAC).(*ac.Srv)
+	var a ReqRole
+	if e := c.GetJSON(&a); e != nil {
+		return e
+	}
+	if e := s.PostRole(a.Name, a.Desc); e != nil {
+		return e
+	}
+	return acSucc(c, nil)
+}
+func putRole(c sola.Context) error {
+	// s := c.Get(CtxBoxAC).(*ac.Srv)
+	return nil
+}
+func delRole(c sola.Context) error {
+	s := c.Get(CtxBoxAC).(*ac.Srv)
+	list := router.Param(c, "id")
+	id := strings.Split(list, ",")
+	if e := s.DeleteRole(id); e != nil {
+		return e
 	}
 	return acSucc(c, nil)
 }

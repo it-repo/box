@@ -34,16 +34,24 @@ type UserInfo struct {
 // SelectUserList -
 func (s *Srv) SelectUserList(page, size int) []UserInfo {
 	var list []BoxUser
+	var count int
 	db := s.db.Order("id desc").Limit(size).Offset((page - 1) * size)
-	if err := db.Find(&list).Error; err != nil {
+	if err := db.Find(&list).Count(&count).Error; err != nil {
 		return []UserInfo{}
 	}
-	// var relist []UserInfo
-	// relist=list
-	return turn(list)
+	return turn(list, count)
 }
 
-func turn(list []BoxUser) []UserInfo {
+// SelectUsertotal -
+func (s *Srv) SelectUsertotal() int {
+	var count int
+	if err := s.db.Model(&BoxUser{}).Count(&count).Error; err != nil {
+		return 0
+	}
+	return count
+}
+
+func turn(list []BoxUser, count int) []UserInfo {
 	relist := make([]UserInfo, 0, len(list))
 	for _, x := range list {
 		relist = append(relist, UserInfo{
@@ -82,9 +90,12 @@ func (s *Srv) SelectUser(id uint) *UserInfo {
 }
 
 //DeleteUser -
-func (s *Srv) DeleteUser(id int) error {
-	list := BoxUser{}
-	return s.db.Where("id=?", id).Delete(&list).Error
+func (s *Srv) DeleteUser(id []string) error {
+	list := []BoxUser{}
+	for _, x := range id {
+		s.db.Where("id=?", x).Delete(&list)
+	}
+	return nil
 }
 
 //PostUser -
@@ -106,4 +117,62 @@ func (s *Srv) PutUser(id int, nick, pass, avatar, desc string) error {
 		Desc:   desc,
 	}
 	return s.db.Where("id=?", id).Table("box_users").Updates(&list).Error
+}
+
+//Role
+
+//GetListRole -
+func (s *Srv) GetListRole(page, size int) []BoxRole {
+	var list []BoxRole
+	db := s.db.Limit(size).Offset((page - 1) * size)
+	if err := db.Find(&list).Error; err != nil {
+		return []BoxRole{}
+	}
+	return list
+}
+
+//GetRoleCount 获取角色数量
+func (s *Srv) GetRoleCount() int {
+	var count int
+	if err := s.db.Model(&BoxRole{}).Count(&count).Error; err != nil {
+		return 0
+	}
+	return count
+}
+
+//GetRole 获取角色信息
+func (s *Srv) GetRole(id uint) *BoxRole {
+	x := BoxRole{}
+	x.ID = id
+	if err := s.db.First(&x).Error; err != nil {
+		return nil
+	}
+	return &x
+}
+
+//PostRole 增加角色
+func (s *Srv) PostRole(name, desc string) error {
+	list := BoxRole{
+		Name: name,
+		Desc: desc,
+	}
+	return s.db.Create(&list).Error
+}
+
+//DeleteRole 删除角色
+func (s *Srv) DeleteRole(id []string) error {
+	x := BoxRole{}
+	for _, i := range id {
+		s.db.Where("id=?", i).Delete(&x)
+	}
+	return nil
+}
+
+//PutRole 更新角色
+func (s *Srv) PutRole(name, desc string, id int) error {
+	list := &BoxRole{
+		Name: name,
+		Desc: desc,
+	}
+	s.db.Where("id=?", id).Table("box_roles").Updates(&list)
 }
