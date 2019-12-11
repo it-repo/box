@@ -308,8 +308,17 @@ func postRole(c sola.Context) error {
 	return acSucc(c, nil)
 }
 func putRole(c sola.Context) error {
-	// s := c.Get(CtxBoxAC).(*ac.Srv)
-	return nil
+	s := c.Get(CtxBoxAC).(*ac.Srv)
+	id, err := strconv.Atoi(router.Param(c, "id"))
+	if err != nil {
+		return err
+	}
+	var a ReqRole
+	if e := c.GetJSON(&a); e != nil {
+		return e
+	}
+	s.PutRole(a.Name, a.Desc, id)
+	return acSucc(c, nil)
 }
 func delRole(c sola.Context) error {
 	s := c.Get(CtxBoxAC).(*ac.Srv)

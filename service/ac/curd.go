@@ -174,5 +174,5 @@ func (s *Srv) PutRole(name, desc string, id int) error {
 		Name: name,
 		Desc: desc,
 	}
-	s.db.Where("id=?", id).Table("box_roles").Updates(&list)
+	return s.db.Where("id=?", id).Table("box_roles").Updates(&list).Error
 }
