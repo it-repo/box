@@ -1,7 +1,6 @@
 package box
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -76,7 +75,6 @@ func AC(db *gorm.DB, k string, r *router.Router) (sola.Middleware, ACRequest) {
 			} else {
 				rules = toStringArray(auth.Claims(c, "perms"))
 			}
-			fmt.Println(rules)
 			if rule.Check(rules) {
 				return h(c)
 			}
@@ -97,6 +95,12 @@ func AC(db *gorm.DB, k string, r *router.Router) (sola.Middleware, ACRequest) {
 	r.Bind("POST /role", acRequest(acr1, postRole))
 	r.Bind("PUT /role/:id", acRequest(acr1, putRole))
 
+	r.Bind("GET /perm/:id", acRequest(acr1, getPerm))
+	r.Bind("GET /perm", acRequest(acr1, getPerms))
+	r.Bind("DELETE /perm/:id", acRequest(acr1, delPerm))
+	r.Bind("POST /perm", acRequest(acr1, postPerm))
+	r.Bind("PUT /perm/:id", acRequest(acr1, putPerm))
+
 	return jwtAuth, acRequest
 }
 
@@ -104,6 +108,7 @@ func AC(db *gorm.DB, k string, r *router.Router) (sola.Middleware, ACRequest) {
 type ReqUser struct {
 	Username string
 	Password string
+	Rid      []uint
 }
 
 func login(next sola.Handler) sola.Handler {
@@ -204,6 +209,7 @@ func getUsers(c sola.Context) error {
 func getUser(c sola.Context) error {
 	s := c.Get(CtxBoxAC).(*ac.Srv)
 	id, err := strconv.Atoi(router.Param(c, "id"))
+
 	if err != nil {
 		return err
 	}
@@ -225,7 +231,7 @@ func postUser(c sola.Context) error {
 	if e := c.GetJSON(&a); e != nil {
 		return e
 	}
-	if e := s.PostUser(a.Username, a.Password); e != nil {
+	if e := s.PostUser(a.Username, a.Password, a.Rid); e != nil {
 		return fail(c)
 	}
 	return acSucc(c, nil)
@@ -237,6 +243,7 @@ type UserInfo struct {
 	Nick     string
 	Avatar   string
 	Desc     string
+	Rid      []uint
 }
 
 func putUser(c sola.Context) error {
@@ -249,7 +256,7 @@ func putUser(c sola.Context) error {
 	if e != nil {
 		return fail(c)
 	}
-	if e := s.PutUser(id, a.Nick, a.Password, a.Avatar, a.Desc); e != nil {
+	if e := s.PutUser(uint(id), a.Nick, a.Password, a.Avatar, a.Desc, a.Rid); e != nil {
 		return fail(c)
 	}
 	return acSucc(c, nil)
@@ -294,6 +301,7 @@ func getRole(c sola.Context) error {
 type ReqRole struct {
 	Name string
 	Desc string
+	Rid  []uint
 }
 
 func postRole(c sola.Context) error {
@@ -302,7 +310,7 @@ func postRole(c sola.Context) error {
 	if e := c.GetJSON(&a); e != nil {
 		return e
 	}
-	if e := s.PostRole(a.Name, a.Desc); e != nil {
+	if e := s.PostRole(a.Name, a.Desc, a.Rid); e != nil {
 		return e
 	}
 	return acSucc(c, nil)
@@ -317,7 +325,7 @@ func putRole(c sola.Context) error {
 	if e := c.GetJSON(&a); e != nil {
 		return e
 	}
-	s.PutRole(a.Name, a.Desc, id)
+	s.PutRole(a.Name, a.Desc, uint(id), a.Rid)
 	return acSucc(c, nil)
 }
 func delRole(c sola.Context) error {
@@ -327,5 +335,69 @@ func delRole(c sola.Context) error {
 	if e := s.DeleteRole(id); e != nil {
 		return e
 	}
+	return acSucc(c, nil)
+}
+
+// getPerms -
+func getPerms(c sola.Context) error {
+	s := c.Get(CtxBoxAC).(*ac.Srv)
+	r := c.Request()
+	page, err := strconv.Atoi(r.URL.Query().Get("page"))
+	if err != nil {
+		return nil
+	}
+	size, err := strconv.Atoi(r.URL.Query().Get("size"))
+	if err != nil {
+		return nil
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"code": 0,
+		"msg":  "SUCCESS",
+		"data": map[string]interface{}{
+			"total": s.GetPermCount(),
+			"Roles": s.GetListPerm(page, size),
+		},
+	})
+}
+
+// getPerm -
+func getPerm(c sola.Context) error {
+	s := c.Get(CtxBoxAC).(*ac.Srv)
+	id, err := strconv.Atoi(router.Param(c, "id"))
+	if err != nil {
+		return err
+	}
+	return acSucc(c, s.GetPerm(id))
+}
+
+func postPerm(c sola.Context) error {
+	s := c.Get(CtxBoxAC).(*ac.Srv)
+	var a ac.BoxPerm
+	if err := c.GetJSON(&a); err != nil {
+		return err
+	}
+	s.PostPerm(a)
+	return acSucc(c, nil)
+}
+
+func delPerm(c sola.Context) error {
+	s := c.Get(CtxBoxAC).(*ac.Srv)
+	list := router.Param(c, "id")
+	id := strings.Split(list, ",")
+	s.DelPerm(id)
+	return acSucc(c, nil)
+}
+
+func putPerm(c sola.Context) error {
+	s := c.Get(CtxBoxAC).(*ac.Srv)
+	id, err := strconv.Atoi(router.Param(c, "id"))
+	if err != nil {
+		return nil
+	}
+	var a ac.BoxPerm
+	if err := c.GetJSON(&a); err != nil {
+		return err
+	}
+	s.PutPerm(id, a)
 	return acSucc(c, nil)
 }

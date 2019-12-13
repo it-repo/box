@@ -1,6 +1,11 @@
 package ac
 
-import "time"
+import (
+	"fmt"
+	"time"
+
+	"github.com/jinzhu/gorm"
+)
 
 // SelectByID -
 func (s *Srv) SelectByID(id uint) *BoxUser {
@@ -99,24 +104,47 @@ func (s *Srv) DeleteUser(id []string) error {
 }
 
 //PostUser -
-func (s *Srv) PostUser(name, pass string) error {
-	list := BoxUser{
+func (s *Srv) PostUser(name, pass string, id []uint) error {
+	u := BoxUser{
 		Name: name,
 		Nick: name,
 		Pass: pass,
 	}
-	return s.db.Create(&list).Error
+	if e := s.db.Create(&u).Error; e != nil {
+		return e
+	}
+	list := make([]interface{}, 0, len(id))
+	for _, x := range id {
+		list = append(list, &BoxRole{Model: gorm.Model{ID: x}})
+	}
+	return s.db.
+		Model(&BoxUser{Model: gorm.Model{ID: u.ID}}).
+		Association("Roles").
+		Append(list...).
+		Error
 }
 
 //PutUser -
-func (s *Srv) PutUser(id int, nick, pass, avatar, desc string) error {
-	list := BoxUser{
+func (s *Srv) PutUser(id uint, nick, pass, avatar, desc string, rid []uint) error {
+	u := BoxUser{
 		Nick:   nick,
 		Pass:   pass,
 		Avatar: avatar,
 		Desc:   desc,
 	}
-	return s.db.Where("id=?", id).Table("box_users").Updates(&list).Error
+	if err := s.db.Where("id=?", id).Table("box_users").Updates(&u).Error; err != nil {
+		return err
+	}
+
+	list := make([]interface{}, 0, len(rid))
+	for _, x := range rid {
+		list = append(list, &BoxRole{Model: gorm.Model{ID: x}})
+	}
+	return s.db.
+		Model(&BoxUser{Model: gorm.Model{ID: id}}).
+		Association("Roles").
+		Replace(list...).
+		Error
 }
 
 //Role
@@ -151,12 +179,23 @@ func (s *Srv) GetRole(id uint) *BoxRole {
 }
 
 //PostRole 增加角色
-func (s *Srv) PostRole(name, desc string) error {
-	list := BoxRole{
+func (s *Srv) PostRole(name, desc string, rid []uint) error {
+	r := BoxRole{
 		Name: name,
 		Desc: desc,
 	}
-	return s.db.Create(&list).Error
+	if err := s.db.Create(&r).Error; err != nil {
+		return err
+	}
+	list := make([]interface{}, 0, len(rid))
+	for _, X := range rid {
+		list = append(list, &BoxPerm{Model: gorm.Model{ID: X}})
+	}
+	return s.db.
+		Model(&BoxRole{Model: gorm.Model{ID: r.ID}}).
+		Association("Perms").
+		Append(list...).
+		Error
 }
 
 //DeleteRole 删除角色
@@ -169,10 +208,77 @@ func (s *Srv) DeleteRole(id []string) error {
 }
 
 //PutRole 更新角色
-func (s *Srv) PutRole(name, desc string, id int) error {
-	list := &BoxRole{
+func (s *Srv) PutRole(name, desc string, id uint, rid []uint) error {
+	r := &BoxRole{
 		Name: name,
 		Desc: desc,
 	}
-	return s.db.Where("id=?", id).Table("box_roles").Updates(&list).Error
+	if err := s.db.Where("id=?", id).Table("box_roles").Updates(&r).Error; err != nil {
+		return err
+	}
+	list := make([]interface{}, 0, len(rid))
+	for _, X := range rid {
+		fmt.Println(X)
+		list = append(list, &BoxPerm{Model: gorm.Model{ID: X}})
+	}
+	return s.db.
+		Model(&BoxRole{Model: gorm.Model{ID: id}}).
+		Association("Perms").
+		Replace(list...).
+		Error
+}
+
+// GetPermCount 获取总数
+func (s *Srv) GetPermCount() int {
+	var count int
+	if err := s.db.Model(&BoxPerm{}).Count(&count).Error; err != nil {
+		return 0
+	}
+	return count
+}
+
+// GetListPerm 获取列表
+func (s *Srv) GetListPerm(page, size int) []BoxPerm {
+	var list []BoxPerm
+	db := s.db.Limit(size).Offset((page - 1) * size)
+	if err := db.Find(&list).Error; err != nil {
+		return nil
+	}
+	return list
+}
+
+// GetPerm 查询权限
+func (s *Srv) GetPerm(id int) *BoxPerm {
+	list := BoxPerm{}
+	s.db.Where("id=?", id).First(&list)
+	return &list
+}
+
+//PostPerm 增加权限
+func (s *Srv) PostPerm(a BoxPerm) error {
+	list := BoxPerm{
+		Name: a.Name,
+		Desc: a.Desc,
+	}
+	return s.db.Table("box_perms").Create(&list).Error
+}
+
+//DelPerm 删除权限
+func (s *Srv) DelPerm(id []string) error {
+	var list BoxPerm
+	for _, i := range id {
+		if err := s.db.Where("id=?", i).Delete(&list).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+//PutPerm 更新权限
+func (s *Srv) PutPerm(id int, a BoxPerm) error {
+	list := BoxPerm{
+		Name: a.Name,
+		Desc: a.Desc,
+	}
+	return s.db.Where("id=?", id).Updates(&list).Error
 }
