@@ -1,7 +1,6 @@
 package ac
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -218,7 +217,6 @@ func (s *Srv) PutRole(name, desc string, id uint, rid []uint) error {
 	}
 	list := make([]interface{}, 0, len(rid))
 	for _, X := range rid {
-		fmt.Println(X)
 		list = append(list, &BoxPerm{Model: gorm.Model{ID: X}})
 	}
 	return s.db.
