@@ -19,7 +19,7 @@ const (
 )
 
 // Route Middleware
-func Route(db *gorm.DB, r *router.Router) {
+func Route(db *gorm.DB, r *router.Router, acRequest ACRequest) {
 	s := route.New(db)
 	r.Use(func(next sola.Handler) sola.Handler {
 		return func(c sola.Context) error {
@@ -37,9 +37,6 @@ func Route(db *gorm.DB, r *router.Router) {
 		})
 	})
 
-	acRequest := func(a, b sola.Handler) sola.Handler {
-		return b
-	}
 	acr1 := ACR(ac.TypeRole, ac.LogicalOR, "admin")
 	r.Bind("GET /router/:id", acRequest(acr1, getRouter))
 	r.Bind("GET /router", acRequest(acr1, getRouters))

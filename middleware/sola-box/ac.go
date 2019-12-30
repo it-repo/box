@@ -58,7 +58,13 @@ func AC(db *gorm.DB, k string, r *router.Router) (sola.Middleware, ACRequest) {
 	r.Bind("/info", userInfo)
 
 	acRequest := func(acr, h sola.Handler) sola.Handler {
+		if h == nil {
+			panic(ErrNoHandler)
+		}
 		return func(c sola.Context) error {
+			if acr == nil {
+				return h(c)
+			}
 			acr(c)
 			t := c.Get(CtxBoxACRT).(ac.Type)
 			l := c.Get(CtxBoxACRL).(ac.Logical)
@@ -187,20 +193,12 @@ func acSucc(c sola.Context, v interface{}) error {
 //user
 func getUsers(c sola.Context) error {
 	s := c.Get(CtxBoxAC).(*ac.Srv)
-	r := c.Request()
-	page, err := strconv.Atoi(r.URL.Query().Get("page"))
-	if err != nil {
-		return nil
-	}
-	size, err := strconv.Atoi(r.URL.Query().Get("size"))
-	if err != nil {
-		return nil
-	}
+	page, size := getPageSize(c)
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"code": 0,
 		"msg":  "SUCCESS",
 		"data": map[string]interface{}{
-			"user":  s.SelectUserList(page, size),
+			"items": s.SelectUserList(page, size),
 			"total": s.SelectUsertotal(),
 		},
 	})
@@ -267,21 +265,13 @@ func putUser(c sola.Context) error {
 //getRoles 获取角色信息
 func getRoles(c sola.Context) error {
 	s := c.Get(CtxBoxAC).(*ac.Srv)
-	r := c.Request()
-	page, err := strconv.Atoi(r.URL.Query().Get("page"))
-	if err != nil {
-		return nil
-	}
-	size, err := strconv.Atoi(r.URL.Query().Get("size"))
-	if err != nil {
-		return nil
-	}
+	page, size := getPageSize(c)
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"code": 0,
 		"msg":  "SUCCESS",
 		"data": map[string]interface{}{
 			"total": s.GetRoleCount(),
-			"Roles": s.GetListRole(page, size),
+			"items": s.GetListRole(page, size),
 		},
 	})
 }
@@ -341,21 +331,13 @@ func delRole(c sola.Context) error {
 // getPerms -
 func getPerms(c sola.Context) error {
 	s := c.Get(CtxBoxAC).(*ac.Srv)
-	r := c.Request()
-	page, err := strconv.Atoi(r.URL.Query().Get("page"))
-	if err != nil {
-		return nil
-	}
-	size, err := strconv.Atoi(r.URL.Query().Get("size"))
-	if err != nil {
-		return nil
-	}
+	page, size := getPageSize(c)
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"code": 0,
 		"msg":  "SUCCESS",
 		"data": map[string]interface{}{
 			"total": s.GetPermCount(),
-			"Roles": s.GetListPerm(page, size),
+			"items": s.GetListPerm(page, size),
 		},
 	})
 }
