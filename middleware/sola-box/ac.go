@@ -198,7 +198,7 @@ func getUsers(c sola.Context) error {
 		"code": 0,
 		"msg":  "SUCCESS",
 		"data": map[string]interface{}{
-			"user":  s.SelectUserList(page, size),
+			"items": s.SelectUserList(page, size),
 			"total": s.SelectUsertotal(),
 		},
 	})
@@ -271,7 +271,7 @@ func getRoles(c sola.Context) error {
 		"msg":  "SUCCESS",
 		"data": map[string]interface{}{
 			"total": s.GetRoleCount(),
-			"roles": s.GetListRole(page, size),
+			"items": s.GetListRole(page, size),
 		},
 	})
 }
@@ -337,7 +337,7 @@ func getPerms(c sola.Context) error {
 		"msg":  "SUCCESS",
 		"data": map[string]interface{}{
 			"total": s.GetPermCount(),
-			"roles": s.GetListPerm(page, size),
+			"items": s.GetListPerm(page, size),
 		},
 	})
 }

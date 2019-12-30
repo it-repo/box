@@ -22,6 +22,7 @@ type BoxRoute struct {
 	Icon       string `json:"icon,omitempty"`
 	NoCache    bool   `json:"noCache"`
 	Breadcrumb bool   `json:"breadcrumb"`
+	Affix      bool   `json:"affix"`
 
-	Affix bool `json:"affix"`
+	// TODO: e.g. roles: ['admin', 'editor']
 }
